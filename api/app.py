@@ -167,7 +167,10 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             api_key = request.headers.get("x-api-key") or request.headers.get("X-API-Key")
             if api_key != api_config.api_key:
                 logger.warning(f"Unauthorized attempt from {request.client.host} to {path}")
-                raise HTTPException(status_code=401, detail="Invalid or missing API key.")
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "Invalid or missing API key."}
+                )
         
         return await call_next(request)
 
