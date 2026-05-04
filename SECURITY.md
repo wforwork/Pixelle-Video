@@ -23,9 +23,9 @@ When reporting, please include:
 - Proof-of-concept or exploit code (if possible)
 - Impact of the issue
 
-## Security Best Practices
+## Security Features
 
-### API Key Configuration
+### 1. API Key Authentication
 
 **⚠️ IMPORTANT: Change the default API key in production!**
 
@@ -39,25 +39,79 @@ To set your own API key, modify `api/config.py`:
 api_key: str = "your-secure-random-key-here"
 ```
 
-### Environment Variables
-
-For production deployments, use environment variables:
+**Usage:** All `/api/*` endpoints (except `/api/files/`) require the `X-API-Key` header:
 ```bash
-export API_KEY="your-secure-random-key"
+curl -H "X-API-Key: your-key" https://your-server/api/video/generate/sync
 ```
 
-### CORS Configuration
+### 2. Rate Limiting
+
+Rate limiting is enabled by default to prevent abuse:
+
+| Endpoint | Limit |
+|----------|-------|
+| General API | 60/min |
+| Video generation | 10/min |
+| Image generation | 30/min |
+
+**Configuration in `api/config.py`:**
+```python
+rate_limit_enabled: bool = True
+rate_limit_per_minute: int = 60
+rate_limit_video_per_minute: int = 10
+rate_limit_image_per_minute: int = 30
+```
+
+When rate limit is exceeded, the API returns `429 Too Many Requests`.
+
+### 3. Request Logging
+
+All requests are logged with:
+- HTTP method and path
+- Response status code
+- Response time (ms)
+- Client IP address
+
+Logs are output via loguru with INFO level.
+
+### 4. Path Traversal Protection
+
+File access is restricted to whitelisted directories:
+- `output/`
+- `workflows/`
+- `templates/`
+- `bgm/`
+- `resources/`
+- `data/bgm/`
+- `data/templates/`
+
+### 5. CORS Configuration
+
+**⚠️ Default is `*` (allow all origins) - change in production!**
 
 For production, restrict CORS origins in `api/config.py`:
 ```python
 cors_origins: list[str] = ["https://your-trusted-domain.com"]
 ```
 
-### File Upload
+## Security Best Practices
 
-- Maximum upload size: 100MB (configurable)
-- Only files from `output/`, `workflows/`, `templates/`, `bgm/`, `resources/` directories are accessible
-- Path traversal protection is implemented
+### Production Deployment Checklist
+
+- [ ] Change default API key
+- [ ] Set restrictive CORS origins
+- [ ] Use Redis for rate limit storage (instead of in-memory)
+- [ ] Use HTTPS
+- [ ] Consider IP whitelisting
+- [ ] Keep dependencies updated
+
+### Environment Variables
+
+For production deployments:
+```bash
+export API_KEY="your-secure-random-key"
+export CORS_ORIGINS="https://your-domain.com,https://admin.your-domain.com"
+```
 
 ### Dependencies
 
@@ -66,10 +120,3 @@ Keep dependencies updated:
 uv sync
 pip install -r requirements.txt
 ```
-
-## Security Features
-
-- **API Key Authentication**: All `/api/*` endpoints (except `/api/files/`) require `X-API-Key` header
-- **Path Traversal Protection**: File access restricted to whitelisted directories
-- **CORS Middleware**: Configurable cross-origin request handling
-- **Request Logging**: Unauthorized access attempts are logged

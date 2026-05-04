@@ -46,7 +46,13 @@ class APIConfig(BaseModel):
     
     # Security settings
     api_key: str = "pixelle-secure-key-change-me-in-production"  # CHANGE THIS in production!
-    api_key_enabled: bool = True  # Set to False to disable API key auth (not recommended)
+    api_key_enabled: bool = True  # Set to False to disable API key auth (not recommended for production)
+    
+    # Rate limiting settings
+    rate_limit_enabled: bool = True
+    rate_limit_per_minute: int = 60  # General requests per minute
+    rate_limit_video_per_minute: int = 10  # Video generation requests per minute (expensive)
+    rate_limit_image_per_minute: int = 30  # Image generation requests per minute
 
 
 # Global config instance

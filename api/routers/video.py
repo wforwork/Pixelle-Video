@@ -18,9 +18,12 @@ Supports both synchronous and asynchronous video generation.
 
 import os
 from fastapi import APIRouter, HTTPException, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from loguru import logger
 
 from api.dependencies import PixelleVideoDep
+from api.rate_limit import VIDEO_RATE_LIMIT, get_client_ip
 from api.schemas.video import (
     VideoGenerateRequest,
     VideoGenerateResponse,
@@ -29,6 +32,9 @@ from api.schemas.video import (
 from api.tasks import task_manager, TaskType
 
 router = APIRouter(prefix="/video", tags=["Video Generation"])
+
+# Create a limiter for this router
+video_limiter = Limiter(key_func=get_remote_address, default_limits=[VIDEO_RATE_LIMIT])
 
 
 def path_to_url(request: Request, file_path: str) -> str:
@@ -86,6 +92,7 @@ def path_to_url(request: Request, file_path: str) -> str:
 
 
 @router.post("/generate/sync", response_model=VideoGenerateResponse)
+@video_limiter.limit(VIDEO_RATE_LIMIT)
 async def generate_video_sync(
     request_body: VideoGenerateRequest,
     pixelle_video: PixelleVideoDep,
@@ -176,6 +183,7 @@ async def generate_video_sync(
 
 
 @router.post("/generate/async", response_model=VideoGenerateAsyncResponse)
+@video_limiter.limit(VIDEO_RATE_LIMIT)
 async def generate_video_async(
     request_body: VideoGenerateRequest,
     pixelle_video: PixelleVideoDep,

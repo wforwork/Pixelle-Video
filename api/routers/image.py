@@ -15,15 +15,22 @@ Image generation endpoints
 """
 
 from fastapi import APIRouter, HTTPException
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from loguru import logger
 
 from api.dependencies import PixelleVideoDep
+from api.rate_limit import IMAGE_RATE_LIMIT
 from api.schemas.image import ImageGenerateRequest, ImageGenerateResponse
 
 router = APIRouter(prefix="/image", tags=["Basic Services"])
 
+# Create a limiter for this router
+image_limiter = Limiter(key_func=get_remote_address, default_limits=[IMAGE_RATE_LIMIT])
+
 
 @router.post("/generate", response_model=ImageGenerateResponse)
+@image_limiter.limit(IMAGE_RATE_LIMIT)
 async def image_generate(
     request: ImageGenerateRequest,
     pixelle_video: PixelleVideoDep
@@ -67,4 +74,3 @@ async def image_generate(
     except Exception as e:
         logger.error(f"Image generation error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
