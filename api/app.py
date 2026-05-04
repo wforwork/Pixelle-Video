@@ -34,8 +34,9 @@ if str(_project_root) not in sys.path:
 
 import argparse
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from loguru import logger
 
 from api.config import api_config
@@ -119,6 +120,57 @@ if api_config.cors_enabled:
     )
     logger.info(f"CORS enabled for origins: {api_config.cors_origins}")
 
+
+class APIKeyMiddleware(BaseHTTPMiddleware):
+    """
+    API Key authentication middleware.
+    
+    Protects all /api/* endpoints with API key validation.
+    Set X-API-Key header in requests to authenticate.
+    
+    Can be disabled via api_key_enabled config (not recommended for production).
+    """
+    
+    async def dispatch(self, request: Request, call_next):
+        # Skip auth if disabled
+        if not api_config.api_key_enabled:
+            return await call_next(request)
+        
+        # Paths that don't require API key
+        public_paths = {
+            "/",
+            "/health",
+            "/docs",
+            "/redoc",
+            "/openapi.json",
+            "/api/files/",  # Allow file downloads (security handled in files router)
+        }
+        
+        # Allow public paths
+        path = request.url.path
+        if path in public_paths or path.startswith("/docs") or path.startswith("/redoc"):
+            return await call_next(request)
+        
+        # Require API key for all /api/* routes (except /api/files/ which has its own security)
+        if path.startswith("/api/") and not path.startswith("/api/files/"):
+            api_key = request.headers.get("x-api-key") or request.headers.get("X-API-Key")
+            if api_key != api_config.api_key:
+                logger.warning(f"Unauthorized API access attempt from {request.client.host} to {path}")
+                raise HTTPException(
+                    status_code=401,
+                    detail="Invalid or missing API key. Set X-API-Key header."
+                )
+        
+        return await call_next(request)
+
+
+# Add API key middleware
+if api_config.api_key_enabled:
+    app.add_middleware(APIKeyMiddleware)
+    logger.info(f"API Key auth ENABLED (key starts with: {api_config.api_key[:8]}...)")
+else:
+    logger.warning("API Key auth DISABLED - not recommended for production!")
+
 # Include routers
 # Health check (no prefix)
 app.include_router(health_router)
@@ -169,6 +221,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     # Print startup banner
+    api_key_display = api_config.api_key[:8] + "..." if api_config.api_key_enabled else "DISABLED"
     print(f"""
 ╔══════════════════════════════════════════════════════════════╗
 ║                    Pixelle-Video API Server                      ║
@@ -177,6 +230,7 @@ if __name__ == "__main__":
 Starting server at http://{args.host}:{args.port}
 API Docs: http://{args.host}:{args.port}/docs
 ReDoc: http://{args.host}:{args.port}/redoc
+API Key: {api_key_display}
 
 Press Ctrl+C to stop the server
 """)

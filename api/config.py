@@ -43,6 +43,10 @@ class APIConfig(BaseModel):
     docs_url: Optional[str] = "/docs"
     redoc_url: Optional[str] = "/redoc"
     openapi_url: Optional[str] = "/openapi.json"
+    
+    # Security settings
+    api_key: str = "pixelle-secure-key-change-me-in-production"  # CHANGE THIS in production!
+    api_key_enabled: bool = True  # Set to False to disable API key auth (not recommended)
 
 
 # Global config instance
